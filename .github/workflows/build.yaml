@@ -1,0 +1,128 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    needs: create_release
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            filename: unflaton
+            final_filename: unflaton_linux-amd64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            filename: unflaton.exe
+            final_filename: unflaton_windows-amd64.exe
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            filename: unflaton
+            final_filename: unflaton_darwin-amd64
+
+
+    name: Build ${{ matrix.target }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    env:
+      RUST_BACKTRACE: full
+
+    steps:
+      # Checkout the repository
+      - uses: actions/checkout@v3
+
+      - name: Restore cached cargo files
+        id: cache-cargo-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # Install toolchain
+      - name: Install latest rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          default: true
+          profile: minimal
+          override: true
+          target: ${{ matrix.target }}
+          components: rustfmt, clippy, rustc
+
+      # Run Checks
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+
+      # Build
+      - name: Build
+        run: |
+          cargo build --all --release  --target ${{ matrix.target }}
+          strip target/${{ matrix.target }}/release/${{ matrix.filename }}
+          mkdir -p target/release/versions
+          mv target/${{ matrix.target }}/release/${{ matrix.filename }} target/release/versions/${{ matrix.final_filename }}
+
+      - name: Upload release assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          # This is how it will be named on the release page. Put hatever name
+          # you like, remember that they need to be different for each platform.
+          # You can choose any build matrix parameters. For Rust I use the
+          # target triple.
+          asset_name: ${{ matrix.final_filename }}
+          # The path to the file you want to upload.
+          asset_path: target/release/versions/${{ matrix.final_filename }}
+          # probably you will need to change it, but most likely you are
+          # uploading a binary file
+          asset_content_type: application/octet-stream
+
+      # Cache dependencies
+      - name: Save cached cargo files
+        id: cache-cargo-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+            !target/release/versions
+          key: ${{ steps.cache-cargo-restore.outputs.cache-primary-key }}
+
+  create_release:
+    if: startsWith(github.ref, 'refs/tags/')
+
+    name: Create release
+    runs-on: ubuntu-latest
+    # Note this. We are going to use that in further jobs.
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      # Upload artifacts
+      - name: Create Draft Release
+        id: create_release
+        uses: ncipollo/release-action@v1.12.0
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag: "${{ github.ref_name }}"
+          name: "${{ github.ref_name }}"
+          draft: true
+          prerelease: false

@@ -9,6 +9,12 @@ edition = "2021"
 serde_json = "1"
 clap = { version = "4", features = ["derive"] }
 wild = "2"
-colored = "2"
 log = "0.4"
 pretty_env_logger = "0.4"
+
+[profile.release]
+panic = "abort"   # Strip expensive panic clean-up logic
+codegen-units = 1 # Compile crates one after another so the compiler can optimize better
+lto = true        # Enables link to optimizations
+opt-level = "z"   # Optimize for binary size
+strip = true      # Remove debug symbols

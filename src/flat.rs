@@ -13,11 +13,11 @@ fn flatten_object(value: &Value) -> Value {
 
             // If the value is an object, loop through the keys
             if v.is_object() {
-                let flattened = flatten_object(v.into());
+                let flattened = flatten_object(v);
 
                 let old_key = k.clone();
                 for (k, v) in flattened.as_object().unwrap() {
-                    let new_key = format!("{}.{}", old_key, k);
+                    let new_key = format!("{old_key}.{k}");
                     new_data[new_key] = v.clone();
                 }
             } else {

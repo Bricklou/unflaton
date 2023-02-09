@@ -1,5 +1,4 @@
 use clap::Parser;
-use colored::Colorize;
 
 mod flat;
 
@@ -42,37 +41,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     pretty_env_logger::init_custom_env("UNFLATON_LOG");
 
-    let data: Result<serde_json::Value, Box<dyn std::error::Error>>;
-
-    if cli.flatten {
+    let data = if cli.flatten {
         if cli.output.is_some() {
             log::info!(
                 "Flattening {} to {}",
-                cli.clone().input.cyan().italic(),
-                cli.clone()
-                    .output
-                    .unwrap_or("stdout".to_string())
-                    .cyan()
-                    .italic()
+                cli.clone().input,
+                cli.clone().output.unwrap_or("stdout".to_string())
             );
         }
 
-        data = flat::flat(&cli);
+        flat::flat(&cli)
     } else {
         if cli.output.is_some() {
             log::info!(
                 "Unflattening {} to {}",
-                cli.clone().input.cyan().italic(),
-                cli.clone()
-                    .output
-                    .unwrap_or("stdout".to_string())
-                    .cyan()
-                    .italic()
+                cli.clone().input,
+                cli.clone().output.unwrap_or("stdout".to_string())
             );
         }
 
-        data = flat::unflat(&cli);
-    }
+        flat::unflat(&cli)
+    };
 
     let data = match data {
         Ok(data) => data,
